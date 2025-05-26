@@ -2,7 +2,7 @@ import express from 'express';
 import multer from 'multer';
 import amqplib from 'amqplib';
 import dotenv from 'dotenv';
-import AWS from 'aws-sdk';
+import { S3Client, CreateBucketCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 
 dotenv.config();
 
@@ -11,20 +11,20 @@ const QUEUE_NAME = process.env.QUEUE_NAME!;
 const S3_ENDPOINT = process.env.QUEUE_S3_ENDPOINT_URL!;
 const S3_BUCKET = process.env.QUEUE_S3_BUCKET!;
 
-AWS.config.update({
-  accessKeyId: process.env.QUEUE_AWS_ACCESS_KEY_ID,
-  secretAccessKey: process.env.QUEUE_AWS_SECRET_ACCESS_KEY,
+const s3 = new S3Client({
   region: process.env.QUEUE_AWS_REGION,
-});
-const s3 = new AWS.S3({
   endpoint: S3_ENDPOINT,
-  s3ForcePathStyle: true,
+  credentials: {
+    accessKeyId: process.env.QUEUE_AWS_ACCESS_KEY_ID || '',
+    secretAccessKey: process.env.QUEUE_AWS_SECRET_ACCESS_KEY || ''
+  },
+  forcePathStyle: true
 });
 
 async function connectRabbitMQ() {
   let connection;
   let attempts = 0;
-  const maxAttempts = 10;
+  const maxAttempts = 20;
   
   while (!connection && attempts < maxAttempts) {
     try {
@@ -46,7 +46,7 @@ async function connectRabbitMQ() {
 
 async function start() {
   try {
-    await s3.createBucket({ Bucket: S3_BUCKET }).promise();
+    await s3.send(new CreateBucketCommand({ Bucket: S3_BUCKET }));
   } catch (err) {
     console.log('Bucket already exists or creation failed');
   }
@@ -79,16 +79,21 @@ async function start() {
     }
 
     try {
+      try {
+        await s3.send(new CreateBucketCommand({ Bucket: S3_BUCKET }));
+      } catch (err) {
+      }
+
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         const fileId = ids[i];
 
-        await s3.putObject({
+        await s3.send(new PutObjectCommand({
           Bucket: S3_BUCKET,
           Key: fileId,
           Body: file.buffer,
           ContentType: file.mimetype,
-        }).promise();
+        }));
 
         const msg = { 
           fileId,
