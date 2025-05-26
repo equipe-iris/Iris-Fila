@@ -1,0 +1,38 @@
+version: '3.8'
+services:
+  localstack:
+    image: localstack/localstack:latest
+    ports:
+      - "4566:4566"
+    environment:
+      - SERVICES=s3
+      - AWS_DEFAULT_REGION=${QUEUE_AWS_REGION:-us-east-1}
+      - AWS_ACCESS_KEY_ID=${QUEUE_AWS_ACCESS_KEY_ID:-test}
+      - AWS_SECRET_ACCESS_KEY=${QUEUE_AWS_SECRET_ACCESS_KEY:-test}
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - '5672:5672'
+      - '15672:15672'
+    environment:
+      RABBITMQ_DEFAULT_USER: '${RABBITMQ_DEFAULT_USER:-guest}'
+      RABBITMQ_DEFAULT_PASS: '${RABBITMQ_DEFAULT_PASS:-guest}'
+
+  queue-service:
+    build: .
+    ports:
+      - '${QUEUE_PORT:-9005}:${QUEUE_PORT:-9005}'
+    environment:
+      QUEUE_RABBITMQ_URL: '${QUEUE_RABBITMQ_URL}'
+      QUEUE_NAME: '${QUEUE_NAME}'
+      QUEUE_AWS_ACCESS_KEY_ID: '${QUEUE_AWS_ACCESS_KEY_ID}'
+      QUEUE_AWS_SECRET_ACCESS_KEY: '${QUEUE_AWS_SECRET_ACCESS_KEY}'
+      QUEUE_AWS_REGION: '${QUEUE_AWS_REGION}'
+      QUEUE_S3_ENDPOINT_URL: '${QUEUE_S3_ENDPOINT_URL}'
+      QUEUE_S3_BUCKET: '${QUEUE_S3_BUCKET}'
+      QUEUE_PORT: '${QUEUE_PORT}'
+    depends_on:
+      - rabbitmq
+      - localstack
+    restart: unless-stopped
