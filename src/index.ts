@@ -11,7 +11,7 @@ const QUEUE_NAME = process.env.QUEUE_NAME!;
 const S3_ENDPOINT = process.env.QUEUE_S3_ENDPOINT_URL!;
 const S3_BUCKET = process.env.QUEUE_S3_BUCKET!;
 
-const s3 = new S3Client({
+const s3Config: any = {
   region: process.env.QUEUE_AWS_REGION,
   endpoint: S3_ENDPOINT,
   credentials: {
@@ -19,7 +19,13 @@ const s3 = new S3Client({
     secretAccessKey: process.env.QUEUE_AWS_SECRET_ACCESS_KEY || ''
   },
   forcePathStyle: true
-});
+};
+
+if (process.env.QUEUE_AWS_SESSION_TOKEN) {
+  s3Config.credentials.sessionToken = process.env.QUEUE_AWS_SESSION_TOKEN;
+}
+
+const s3 = new S3Client(s3Config);
 
 async function connectRabbitMQ() {
   let connection;
